@@ -5,6 +5,7 @@ const reviewSchema = new mongoose.Schema(
         photo: {
             type: String,
             required: [true, 'Photo URL is required'],
+            trim: true,
         },
         foodName: {
             type: String,
@@ -43,7 +44,7 @@ const reviewSchema = new mongoose.Schema(
         },
     },
     {
-        collection: 'Food', 
+        collection: 'Food',
     }
 );
 
