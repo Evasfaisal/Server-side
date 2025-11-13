@@ -26,15 +26,13 @@ connectDB();
 
 
 const reviewRoutes = require('./routes/reviewRoutes');
-const restaurantRoutes = require('./routes/restaurantRoutes'); 
-
+const restaurantRoutes = require('./routes/restaurantRoutes');
 const favoriteRoutes = require('./routes/favoriteRoutes');
 
 
-app.use('/api/favorites', favoriteRoutes);
-
 app.use('/api/reviews', reviewRoutes);
-app.use('/api/restaurants', restaurantRoutes); 
+app.use('/api/restaurants', restaurantRoutes);
+app.use('/api/favorites', favoriteRoutes);
 
 
 app.get('/', (req, res) => {
