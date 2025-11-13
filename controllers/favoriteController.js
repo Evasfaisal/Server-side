@@ -1,59 +1,41 @@
-const { ObjectId } = require("mongodb");
-const client = require("../db/mongoClient"); 
+const Favorite = require('../models/Favorite');
+const Review = require('../models/Review');
 
 
-const getFavorites = async (req, res) => {
-    const email = req.query.email;
+exports.addFavorite = async (req, res) => {
     try {
-        const favorites = await client
-            .db("foodLover")
-            .collection("favorites")
-            .aggregate([
-                { $match: { userEmail: email } },
-                {
-                    $lookup: {
-                        from: "reviews",
-                        localField: "reviewId",
-                        foreignField: "_id",
-                        as: "review",
-                    },
-                },
-                { $unwind: "$review" },
-            ])
-            .toArray();
-        res.json(favorites);
+        const { userEmail, reviewId } = req.body;
+
+      
+        const existing = await Favorite.findOne({ userEmail, reviewId });
+        if (existing) return res.status(400).json({ message: "Already in favorites" });
+
+        const favorite = new Favorite({ userEmail, reviewId });
+        await favorite.save();
+        res.status(201).json(favorite);
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        res.status(500).json({ message: "Error adding favorite", error: err.message });
     }
 };
 
 
-const addFavorite = async (req, res) => {
-    const { userEmail, reviewId } = req.body;
+exports.getFavoritesByUser = async (req, res) => {
     try {
-        const result = await client.db("foodLover").collection("favorites").insertOne({
-            userEmail,
-            reviewId: ObjectId(reviewId),
-            addedAt: new Date(),
-        });
-        res.json(result);
+        const { email } = req.params;
+        const favorites = await Favorite.find({ userEmail: email }).populate('reviewId');
+        res.status(200).json(favorites);
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        res.status(500).json({ message: "Error fetching favorites", error: err.message });
     }
 };
 
 
-const deleteFavorite = async (req, res) => {
-    const id = req.params.id;
+exports.removeFavorite = async (req, res) => {
     try {
-        const result = await client
-            .db("foodLover")
-            .collection("favorites")
-            .deleteOne({ _id: ObjectId(id) });
-        res.json(result);
+        const { id } = req.params;
+        await Favorite.findByIdAndDelete(id);
+        res.status(200).json({ message: "Favorite removed" });
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        res.status(500).json({ message: "Error removing favorite", error: err.message });
     }
 };
-
-module.exports = { getFavorites, addFavorite, deleteFavorite };
