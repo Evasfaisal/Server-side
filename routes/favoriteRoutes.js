@@ -1,38 +1,54 @@
 
-const express = require("express");
+const express = require('express');
 const router = express.Router();
-const Favorite = require("../models/Favorite");
+const Favorite = require('../models/Favorite');
 
 
-router.get("/", async (req, res) => {
+router.get('/', async (req, res) => {
+    const { email } = req.query;
+    if (!email) return res.status(400).json({ message: 'Email is required' });
+
     try {
-        const { email } = req.query;
-        const favorites = await Favorite.find({ userEmail: email }).populate("review");
+        const favorites = await Favorite.find({ userEmail: email }).populate('reviewId');
         res.json(favorites);
     } catch (err) {
-        res.status(500).json({ message: "Error fetching favorites" });
+        console.error(err);
+        res.status(500).json({ message: 'Error fetching favorites' });
     }
 });
 
 
-router.post("/", async (req, res) => {
+router.post('/', async (req, res) => {
+    const { userEmail, reviewId } = req.body;
+    if (!userEmail || !reviewId)
+        return res.status(400).json({ message: 'userEmail and reviewId are required' });
+
     try {
-        const { userEmail, reviewId } = req.body;
-        const favorite = new Favorite({ userEmail, review: reviewId });
-        await favorite.save();
-        res.json(favorite);
+    
+        const exists = await Favorite.findOne({ userEmail, reviewId });
+        if (exists) return res.status(400).json({ message: 'Already in favorites' });
+
+        const newFav = new Favorite({ userEmail, reviewId });
+        await newFav.save();
+        res.status(201).json(newFav);
     } catch (err) {
-        res.status(500).json({ message: "Error adding favorite" });
+        console.error(err);
+        res.status(500).json({ message: 'Error adding favorite' });
     }
 });
 
 
-router.delete("/:id", async (req, res) => {
+router.delete('/:reviewId', async (req, res) => {
+    const { reviewId } = req.params;
+    const { email } = req.query;
+    if (!email) return res.status(400).json({ message: 'Email is required' });
+
     try {
-        await Favorite.findByIdAndDelete(req.params.id);
-        res.json({ message: "Favorite removed" });
+        await Favorite.findOneAndDelete({ userEmail: email, reviewId });
+        res.json({ message: 'Removed from favorites' });
     } catch (err) {
-        res.status(500).json({ message: "Error deleting favorite" });
+        console.error(err);
+        res.status(500).json({ message: 'Error removing favorite' });
     }
 });
 
