@@ -4,42 +4,77 @@ const dotenv = require('dotenv');
 const mongoose = require('mongoose');
 
 dotenv.config();
-
 const app = express();
 const port = process.env.PORT || 5000;
 
-
-app.use(cors());
 app.use(express.json());
+const allowAll = String(process.env.CORS_ALLOW_ALL || 'true').toLowerCase() === 'true';
+const rawOrigins = process.env.CLIENT_URLS || process.env.CLIENT_URL || 'http://localhost:5173,http://localhost:5174';
+const allowedOrigins = rawOrigins.split(',').map(o => o.trim()).filter(Boolean);
+const allowLocalhostAll = String(process.env.ALLOW_LOCALHOST_ALL || 'true').toLowerCase() === 'true';
+const corsOptions = {
+  origin: function (origin, callback) {
+    if (allowAll) return callback(null, true);
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin)) return callback(null, true);
+    if (allowLocalhostAll && /^https?:\/\/(localhost|127\.0\.0\.1)(:\\d+)?$/.test(origin)) return callback(null, true);
+    return callback(new Error('Not allowed by CORS'));
+  },
+  credentials: true,
+};
+app.use(cors(corsOptions));
 
+app.use((req, res, next) => {
+  if (req.method === 'OPTIONS') {
+    res.header('Access-Control-Allow-Origin', req.headers.origin);
+    res.header('Access-Control-Allow-Methods', req.headers['access-control-request-method']);
+    res.header('Access-Control-Allow-Headers', req.headers['access-control-request-headers']);
+    return res.status(403).json({ message: 'CORS Preflight check failed. Your origin is likely not allowed.' });
+  }
+  next();
+});
 
-async function connectDB() {
-    try {
-        await mongoose.connect(process.env.MONGO_URI);
-        console.log(' MongoDB connected successfully');
-    } catch (err) {
-        console.error(' MongoDB connection error:', err);
-        process.exit(1); 
-    }
+let optionalAuth;
+try {
+  ({ optionalAuth } = require('./middleware/auth'));
+} catch (e) {
+  optionalAuth = (req, _res, next) => {
+    const header = req.headers['x-user-email'];
+    if (typeof header === 'string') req.userEmail = header;
+    else if (Array.isArray(header)) req.userEmail = header[0];
+    next();
+  };
 }
-connectDB();
+app.use(optionalAuth);
 
+mongoose.connect(process.env.MONGO_URI)
+  .then(() => console.log("✅ MongoDB Connected"))
+  .catch(err => { console.error(err); process.exit(1); });
 
 const reviewRoutes = require('./routes/reviewRoutes');
-const restaurantRoutes = require('./routes/restaurantRoutes');
 const favoriteRoutes = require('./routes/favoriteRoutes');
-
+const restaurantRoutes = require('./routes/restaurantRoutes');
 
 app.use('/api/reviews', reviewRoutes);
-app.use('/api/restaurants', restaurantRoutes);
 app.use('/api/favorites', favoriteRoutes);
-
+app.use('/api/restaurants', restaurantRoutes);
 
 app.get('/', (req, res) => {
-    res.send(' Local Food Lovers Server is Running Successfully!');
+  res.send('Server running...');
 });
 
-
-app.listen(port, () => {
-    console.log(` Server is running on port ${port}`);
+app.use((err, req, res, next) => {
+  console.error('Unhandled error:', err);
+  if (err.name === 'ValidationError') {
+    return res.status(400).json({ message: err.message });
+  }
+  if (err.type === 'entity.parse.failed' || err instanceof SyntaxError) {
+    return res.status(400).json({ message: 'Invalid JSON payload' });
+  }
+  if (err.message === 'Not allowed by CORS') {
+    return res.status(403).json({ message: 'Origin not allowed by CORS' });
+  }
+  return res.status(500).json({ message: 'Internal Server Error' });
 });
+
+app.listen(port, () => console.log(`Server running on port ${port}`));

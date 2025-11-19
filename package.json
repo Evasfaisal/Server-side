@@ -11,9 +11,11 @@
   "license": "ISC",
   "description": "��#\u0000 \u0000S\u0000e\u0000r\u0000v\u0000e\u0000r\u0000-\u0000s\u0000i\u0000d\u0000e\u0000\r\u0000 \u0000",
   "dependencies": {
+    "axios": "^1.13.2",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "express": "^5.1.0",
+    "firebase-admin": "^12.6.0",
     "mongodb": "^7.0.0",
     "mongoose": "^8.19.3"
   },

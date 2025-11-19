@@ -1,15 +1,13 @@
-const mongoose = require('mongoose');
+const mongoose = require("mongoose");
 
-const favoriteSchema = new mongoose.Schema({
-    userEmail: { type: String, required: true },
-   
-    review: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'Review',
-        required: true
-    },
+const favoriteSchema = new mongoose.Schema(
+  {
+    userEmail: { type: String, required: true, lowercase: true, trim: true },
+    review: { type: mongoose.Schema.Types.ObjectId, ref: "Review", required: true },
+  },
+  { timestamps: true }
+);
 
-    dateAdded: { type: Date, default: Date.now }
-});
+favoriteSchema.index({ userEmail: 1, review: 1 }, { unique: true });
 
-module.exports = mongoose.model('Favorite', favoriteSchema);
+module.exports = mongoose.models.Favorite || mongoose.model("Favorite", favoriteSchema);
