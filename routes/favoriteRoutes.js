@@ -2,17 +2,7 @@ const express = require("express");
 const router = express.Router();
 const mongoose = require("mongoose");
 const Favorite = require("../models/Favorite");
-let requireAuth = (req, res, next) => next();
-let optionalAuth = (req, _res, next) => {
-    const header = req.headers['x-user-email'];
-    if (typeof header === 'string') req.userEmail = header;
-    else if (Array.isArray(header)) req.userEmail = header[0];
-    next();
-};
-try {
-    ({ requireAuth, optionalAuth } = require("../middleware/auth"));
-} catch (e) {
-}
+const { verifyFirebaseToken } = require("../middleware/firebaseAuth");
 
 router.get("/", async (req, res) => {
     const { email: emailQuery, idsOnly, mode } = req.query;
@@ -75,7 +65,7 @@ router.get("/reviews", async (req, res) => {
     }
 });
 
-router.post("/", optionalAuth, async (req, res) => {
+router.post("/", verifyFirebaseToken, async (req, res) => {
     const { userEmail, review, reviewId: bodyReviewId } = req.body;
 
     const reviewId = bodyReviewId || (typeof review === 'object' && review !== null ? (review._id || review.id) : review);
@@ -119,7 +109,7 @@ router.post("/", optionalAuth, async (req, res) => {
     }
 });
 
-router.delete("/", optionalAuth, async (req, res) => {
+router.delete("/", verifyFirebaseToken, async (req, res) => {
     const { userEmail, review } = req.body;
 
     const reviewId = typeof review === 'object' && review !== null ? (review._id || review.id) : review;
@@ -149,7 +139,7 @@ router.delete("/", optionalAuth, async (req, res) => {
     }
 });
 
-router.delete("/:id", optionalAuth, async (req, res) => {
+router.delete("/:id", verifyFirebaseToken, async (req, res) => {
     const tokenEmail = String(req.userEmail || '').toLowerCase();
     const allowBody = (process.env.ALLOW_DEV_EMAIL_BODY || 'false').toLowerCase() === 'true';
     const queryEmail = req.query && req.query.email ? String(req.query.email).toLowerCase().trim() : '';
