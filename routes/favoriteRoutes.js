@@ -1,7 +1,8 @@
 const express = require("express");
 const router = express.Router();
-const mongoose = require("mongoose");
-const Favorite = require("../models/Favorite");
+const { ObjectId } = require('mongodb');
+const { getFavoritesCollection } = require('../models/Favorite');
+const { getReviewsCollection } = require('../models/Review');
 const { verifyFirebaseToken } = require("../middleware/firebaseAuth");
 
 router.get("/", async (req, res) => {
@@ -20,11 +21,15 @@ router.get("/", async (req, res) => {
         const wantIds = String(idsOnly || '').toLowerCase() === 'true' || modeStr === 'ids';
         const wantReviews = modeStr === 'reviews';
 
-        const favorites = await Favorite.find({ userEmail: effectiveEmail })
-            .populate({ path: 'review', select: wantIds ? '_id' : undefined })
-            .sort({ createdAt: -1 })
-            .lean();
-
+        const favoritesCol = getFavoritesCollection(req.app);
+        const reviewsCol = getReviewsCollection(req.app);
+        const favorites = await favoritesCol.find({ userEmail: effectiveEmail }).sort({ createdAt: -1 }).toArray();
+        // Populate review field manually
+        for (const fav of favorites) {
+            if (fav.review) {
+                fav.review = await reviewsCol.findOne({ _id: new ObjectId(fav.review) });
+            }
+        }
         const valid = favorites.filter(f => f.review !== null);
         console.log('[favorites] GET /api/favorites results', { total: favorites.length, valid: valid.length, wantIds, wantReviews });
         if (wantIds) {
@@ -51,12 +56,14 @@ router.get("/reviews", async (req, res) => {
         if (headerEmail && queryEmail && headerEmail !== queryEmail) {
             return res.status(403).json({ message: 'Forbidden: email mismatch' });
         }
-
-        const favorites = await Favorite.find({ userEmail: effectiveEmail })
-            .populate('review')
-            .sort({ createdAt: -1 })
-            .lean();
-
+        const favoritesCol = getFavoritesCollection(req.app);
+        const reviewsCol = getReviewsCollection(req.app);
+        const favorites = await favoritesCol.find({ userEmail: effectiveEmail }).sort({ createdAt: -1 }).toArray();
+        for (const fav of favorites) {
+            if (fav.review) {
+                fav.review = await reviewsCol.findOne({ _id: new ObjectId(fav.review) });
+            }
+        }
         console.log('[favorites] GET /api/favorites/reviews results', { favCount: favorites.length });
         return res.json(favorites);
     } catch (err) {
@@ -67,12 +74,10 @@ router.get("/reviews", async (req, res) => {
 
 router.post("/", verifyFirebaseToken, async (req, res) => {
     const { userEmail, review, reviewId: bodyReviewId } = req.body;
-
     const reviewId = bodyReviewId || (typeof review === 'object' && review !== null ? (review._id || review.id) : review);
-    if (!mongoose.Types.ObjectId.isValid(reviewId)) {
+    if (!ObjectId.isValid(reviewId)) {
         return res.status(400).json({ message: "Invalid review ID" });
     }
-
     try {
         const tokenEmail = String(req.userEmail || '').toLowerCase();
         const bodyEmail = userEmail ? String(userEmail || '').toLowerCase().trim() : '';
@@ -81,26 +86,19 @@ router.post("/", verifyFirebaseToken, async (req, res) => {
         console.log('[favorites] POST /api/favorites', { tokenEmail, bodyEmail, effectiveEmail, reviewId });
         if (!effectiveEmail) return res.status(401).json({ message: 'Unauthorized' });
         if (tokenEmail && bodyEmail && tokenEmail !== bodyEmail) return res.status(403).json({ message: "Forbidden: email mismatch" });
-        const reviewObjId = new mongoose.Types.ObjectId(reviewId);
-
-        const exists = await Favorite.findOne({
-            userEmail: effectiveEmail,
-            review: reviewObjId,
-        });
-
+        const favoritesCol = getFavoritesCollection(req.app);
+        const reviewsCol = getReviewsCollection(req.app);
+        const reviewObjId = new ObjectId(reviewId);
+        const exists = await favoritesCol.findOne({ userEmail: effectiveEmail, review: reviewObjId });
         if (exists) {
-            await exists.populate("review");
+            exists.review = await reviewsCol.findOne({ _id: reviewObjId });
             console.log('[favorites] POST existed -> returning 200');
             return res.status(200).json(exists);
         }
-
-        const favorite = new Favorite({
-            userEmail: effectiveEmail,
-            review: reviewObjId,
-        });
-
-        await favorite.save();
-        await favorite.populate("review");
+        const favorite = { userEmail: effectiveEmail, review: reviewObjId, createdAt: new Date() };
+        const result = await favoritesCol.insertOne(favorite);
+        favorite._id = result.insertedId;
+        favorite.review = await reviewsCol.findOne({ _id: reviewObjId });
         console.log('[favorites] POST created favorite');
         res.status(201).json(favorite);
     } catch (err) {
@@ -111,12 +109,10 @@ router.post("/", verifyFirebaseToken, async (req, res) => {
 
 router.delete("/", verifyFirebaseToken, async (req, res) => {
     const { userEmail, review } = req.body;
-
     const reviewId = typeof review === 'object' && review !== null ? (review._id || review.id) : review;
-    if (!reviewId || !mongoose.Types.ObjectId.isValid(reviewId)) {
+    if (!reviewId || !ObjectId.isValid(reviewId)) {
         return res.status(400).json({ message: "Invalid data" });
     }
-
     try {
         const tokenEmail = String(req.userEmail || '').toLowerCase();
         const bodyEmail = userEmail ? String(userEmail || '').toLowerCase().trim() : '';
@@ -125,12 +121,9 @@ router.delete("/", verifyFirebaseToken, async (req, res) => {
         console.log('[favorites] DELETE /api/favorites (body)', { tokenEmail, bodyEmail, effectiveEmail, reviewId });
         if (!effectiveEmail) return res.status(401).json({ message: 'Unauthorized' });
         if (tokenEmail && bodyEmail && tokenEmail !== bodyEmail) return res.status(403).json({ message: "Forbidden: email mismatch" });
-        const deleted = await Favorite.findOneAndDelete({
-            userEmail: effectiveEmail,
-            review: new mongoose.Types.ObjectId(reviewId),
-        });
-
-        if (!deleted) return res.status(404).json({ message: "Not found" });
+        const favoritesCol = getFavoritesCollection(req.app);
+        const deleted = await favoritesCol.findOneAndDelete({ userEmail: effectiveEmail, review: new ObjectId(reviewId) });
+        if (!deleted.value) return res.status(404).json({ message: "Not found" });
         console.log('[favorites] DELETE (body) removed');
         res.json({ message: "Removed from favorites" });
     } catch (err) {
@@ -146,14 +139,15 @@ router.delete("/:id", verifyFirebaseToken, async (req, res) => {
     const effectiveEmail = tokenEmail || (allowBody ? queryEmail : '');
     if (!effectiveEmail) return res.status(401).json({ message: 'Unauthorized' });
     const id = req.params.id;
-    if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ message: 'Invalid id' });
+    if (!ObjectId.isValid(id)) return res.status(400).json({ message: 'Invalid id' });
     try {
         console.log('[favorites] DELETE /api/favorites/:id', { effectiveEmail, id });
-        let deleted = await Favorite.findOneAndDelete({ _id: id, userEmail: effectiveEmail });
-        if (!deleted) {
-            deleted = await Favorite.findOneAndDelete({ review: new mongoose.Types.ObjectId(id), userEmail: effectiveEmail });
+        const favoritesCol = getFavoritesCollection(req.app);
+        let deleted = await favoritesCol.findOneAndDelete({ _id: new ObjectId(id), userEmail: effectiveEmail });
+        if (!deleted.value) {
+            deleted = await favoritesCol.findOneAndDelete({ review: new ObjectId(id), userEmail: effectiveEmail });
         }
-        if (!deleted) return res.status(404).json({ message: 'Not found' });
+        if (!deleted.value) return res.status(404).json({ message: 'Not found' });
         console.log('[favorites] DELETE /:id removed');
         return res.json({ message: 'Removed from favorites' });
     } catch (err) {

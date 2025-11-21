@@ -1,7 +1,9 @@
 const express = require('express');
 const cors = require('cors');
+
+const { MongoClient } = require('mongodb');
 const dotenv = require('dotenv');
-const mongoose = require('mongoose');
+
 
 dotenv.config();
 const app = express();
@@ -45,11 +47,32 @@ try {
     next();
   };
 }
+
 app.use(optionalAuth);
 
-mongoose.connect(process.env.MONGO_URI)
-  .then(() => console.log("✅ MongoDB Connected"))
-  .catch(err => { console.error(err); process.exit(1); });
+// MongoDB connection
+const mongoUri = process.env.MONGO_URI;
+const client = new MongoClient(mongoUri, { useUnifiedTopology: true });
+
+async function startServer() {
+  try {
+    await client.connect();
+    const db = client.db();
+    app.locals.db = db;
+    app.locals.reviews = db.collection('reviews');
+    app.locals.restaurants = db.collection('restaurants');
+    app.locals.favorites = db.collection('favorites');
+    console.log('MongoDB Connected');
+    app.listen(port, () => console.log(`Server running on port ${port}`));
+  } catch (err) {
+    console.error('Failed to connect to MongoDB', err);
+    process.exit(1);
+  }
+}
+
+startServer();
+
+
 
 const reviewRoutes = require('./routes/reviewRoutes');
 const favoriteRoutes = require('./routes/favoriteRoutes');
@@ -77,4 +100,4 @@ app.use((err, req, res, next) => {
   return res.status(500).json({ message: 'Internal Server Error' });
 });
 
-app.listen(port, () => console.log(`Server running on port ${port}`));
+

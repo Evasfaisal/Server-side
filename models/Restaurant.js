@@ -1,10 +1,7 @@
-const mongoose = require("mongoose");
 
-const restaurantSchema = new mongoose.Schema({
-    name: String,
-    location: String,
-    image: String,
-    rating: Number
-});
+// Helper to get the restaurants collection from app.locals
+function getRestaurantsCollection(app) {
+    return app.locals.restaurants;
+}
 
-module.exports = mongoose.model("Restaurant", restaurantSchema);
+module.exports = { getRestaurantsCollection };

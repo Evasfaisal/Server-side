@@ -1,7 +1,6 @@
 const express = require('express');
-const mongoose = require('mongoose');
-const Review = require('../models/Review');
-const Favorite = require('../models/Favorite');
+const { ObjectId } = require('mongodb');
+const { getReviewsCollection } = require('../models/Review');
 let requireAuth = (req, res, next) => next();
 try {
     ({ requireAuth } = require('../middleware/auth'));
@@ -15,19 +14,15 @@ router.get('/', async (req, res) => {
     try {
         const { email, sort, search, limit } = req.query;
         const query = {};
-
         if (email) query.userEmail = email;
         if (search) query.foodName = { $regex: search, $options: 'i' };
-
-        let q = Review.find(query);
-
-        if (sort === 'date_desc') q = q.sort({ postedDate: -1 });
-        else if (sort === 'date_asc') q = q.sort({ postedDate: 1 });
-        else if (sort === 'rating_desc') q = q.sort({ rating: -1 });
-
-        if (limit) q = q.limit(parseInt(limit, 10));
-
-        const result = await q.exec();
+        const reviewsCol = getReviewsCollection(req.app);
+        let cursor = reviewsCol.find(query);
+        if (sort === 'date_desc') cursor = cursor.sort({ postedDate: -1 });
+        else if (sort === 'date_asc') cursor = cursor.sort({ postedDate: 1 });
+        else if (sort === 'rating_desc') cursor = cursor.sort({ rating: -1 });
+        if (limit) cursor = cursor.limit(parseInt(limit, 10));
+        const result = await cursor.toArray();
         res.json(result);
     } catch (err) {
         console.error('GET /api/reviews error:', err);
@@ -35,9 +30,10 @@ router.get('/', async (req, res) => {
     }
 });
 
-router.get('/top', async (_req, res) => {
+router.get('/top', async (req, res) => {
     try {
-        const reviews = await Review.find().sort({ rating: -1 }).limit(6);
+        const reviewsCol = getReviewsCollection(req.app);
+        const reviews = await reviewsCol.find().sort({ rating: -1 }).limit(6).toArray();
         res.json(reviews);
     } catch (err) {
         console.error('GET /api/reviews/top error:', err);
@@ -45,9 +41,10 @@ router.get('/top', async (_req, res) => {
     }
 });
 
-router.get('/recent', async (_req, res) => {
+router.get('/recent', async (req, res) => {
     try {
-        const reviews = await Review.find().sort({ postedDate: -1 }).limit(6);
+        const reviewsCol = getReviewsCollection(req.app);
+        const reviews = await reviewsCol.find().sort({ postedDate: -1 }).limit(6).toArray();
         res.json(reviews);
     } catch (err) {
         console.error('GET /api/reviews/recent error:', err);
@@ -59,17 +56,15 @@ router.get('/mine', requireAuth, async (req, res) => {
     try {
         const email = (req.userEmail || '').toLowerCase();
         if (!email) return res.status(401).json({ message: 'Unauthorized' });
-
         const { sort, search } = req.query;
         const query = { userEmail: email };
         if (search) query.foodName = { $regex: search, $options: 'i' };
-
-        let q = Review.find(query);
-        if (sort === 'date_desc') q = q.sort({ postedDate: -1 });
-        else if (sort === 'date_asc') q = q.sort({ postedDate: 1 });
-        else if (sort === 'rating_desc') q = q.sort({ rating: -1 });
-
-        const result = await q.exec();
+        const reviewsCol = getReviewsCollection(req.app);
+        let cursor = reviewsCol.find(query);
+        if (sort === 'date_desc') cursor = cursor.sort({ postedDate: -1 });
+        else if (sort === 'date_asc') cursor = cursor.sort({ postedDate: 1 });
+        else if (sort === 'rating_desc') cursor = cursor.sort({ rating: -1 });
+        const result = await cursor.toArray();
         res.json(result);
     } catch (err) {
         console.error('GET /api/reviews/mine error:', err);
@@ -79,10 +74,12 @@ router.get('/mine', requireAuth, async (req, res) => {
 
 router.get('/:id', async (req, res) => {
     try {
-        if (!mongoose.isValidObjectId(req.params.id)) {
+        const { id } = req.params;
+        if (!ObjectId.isValid(id)) {
             return res.status(400).json({ message: 'Invalid review ID' });
         }
-        const review = await Review.findById(req.params.id);
+        const reviewsCol = getReviewsCollection(req.app);
+        const review = await reviewsCol.findOne({ _id: new ObjectId(id) });
         if (!review) return res.status(404).json({ message: 'Review not found' });
         res.json(review);
     } catch (err) {
