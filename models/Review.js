@@ -1,5 +1,4 @@
 
-<<<<<<< HEAD
 const { ObjectId } = require('mongodb');
 
 const COLLECTION_NAME = 'reviews';
@@ -43,12 +42,3 @@ module.exports = {
     updateReview,
     deleteReview
 };
-=======
-
-// Helper to get the reviews collection from app.locals
-function getReviewsCollection(app) {
-    return app.locals.reviews;
-}
-
-module.exports = { getReviewsCollection };
->>>>>>> e43baf49644f1ba8644ad1ce26729bc6f034d74e

@@ -1,13 +1,6 @@
-<<<<<<< HEAD
 const { ObjectId } = require('mongodb');
 const Review = require('../models/Review');
 const Favorite = require('../models/Favorite');
-=======
-
-const { ObjectId } = require('mongodb');
-const { getReviewsCollection } = require('../models/Review');
-const { getFavoritesCollection } = require('../models/Favorite');
->>>>>>> e43baf49644f1ba8644ad1ce26729bc6f034d74e
 
 function t(v) { return typeof v === 'string' ? v.trim() : v; }
 function isValidUrl(u) { try { const x = new URL(u); return x.protocol === 'http:' || x.protocol === 'https:'; } catch { return false; } }
@@ -60,17 +53,8 @@ async function createReview(req, res) {
     const n = normalize(req.body);
     const errMsg = validateCreate(n);
     if (errMsg) return res.status(400).json({ message: errMsg });
-<<<<<<< HEAD
     const saved = await Review.createReview(db, { ...n, userEmail: tokenEmail });
     return res.status(201).json(saved);
-=======
-    const review = { ...n, userEmail: tokenEmail };
-    const reviewsCol = getReviewsCollection(req.app);
-    const result = await reviewsCol.insertOne(review);
-    if (!result.acknowledged) throw new Error('Insert failed');
-    review._id = result.insertedId;
-    return res.status(201).json(review);
->>>>>>> e43baf49644f1ba8644ad1ce26729bc6f034d74e
   } catch (err) {
     return res.status(400).json({ message: err.message || 'Failed to add review' });
   }
@@ -78,16 +62,9 @@ async function createReview(req, res) {
 
 async function updateReview(req, res) {
   try {
-<<<<<<< HEAD
     const db = req.app.locals.db;
     if (!ObjectId.isValid(req.params.id)) return res.status(400).json({ message: 'Invalid review ID' });
     const existing = await Review.getReviewById(db, req.params.id);
-=======
-    const { id } = req.params;
-    if (!ObjectId.isValid(id)) return res.status(400).json({ message: 'Invalid review ID' });
-    const reviewsCol = getReviewsCollection(req.app);
-    const existing = await reviewsCol.findOne({ _id: new ObjectId(id) });
->>>>>>> e43baf49644f1ba8644ad1ce26729bc6f034d74e
     if (!existing) return res.status(404).json({ message: 'Review not found' });
 
     const tokenEmail = (req.userEmail || '').toLowerCase();
@@ -97,12 +74,7 @@ async function updateReview(req, res) {
     const errMsg = validateUpdate(n);
     if (errMsg) return res.status(400).json({ message: errMsg });
     const { userEmail, email, ...rest } = n;
-<<<<<<< HEAD
     const updated = await Review.updateReview(db, req.params.id, rest);
-=======
-    await reviewsCol.updateOne({ _id: new ObjectId(id) }, { $set: rest });
-    const updated = await reviewsCol.findOne({ _id: new ObjectId(id) });
->>>>>>> e43baf49644f1ba8644ad1ce26729bc6f034d74e
     return res.json(updated);
   } catch (err) {
     return res.status(400).json({ message: err.message || 'Failed to update review' });
@@ -111,7 +83,6 @@ async function updateReview(req, res) {
 
 async function deleteReview(req, res) {
   try {
-<<<<<<< HEAD
     const db = req.app.locals.db;
     if (!ObjectId.isValid(req.params.id)) return res.status(400).json({ message: 'Invalid review ID' });
     const existing = await Review.getReviewById(db, req.params.id);
@@ -120,18 +91,6 @@ async function deleteReview(req, res) {
     if (!tokenEmail || existing.userEmail.toLowerCase() !== tokenEmail) return res.status(403).json({ message: 'Forbidden: not the owner' });
     await Review.deleteReview(db, req.params.id);
     try { await Favorite.deleteFavorite(db, { review: req.params.id }); } catch { }
-=======
-    const { id } = req.params;
-    if (!ObjectId.isValid(id)) return res.status(400).json({ message: 'Invalid review ID' });
-    const reviewsCol = getReviewsCollection(req.app);
-    const favoritesCol = getFavoritesCollection(req.app);
-    const existing = await reviewsCol.findOne({ _id: new ObjectId(id) });
-    if (!existing) return res.status(404).json({ message: 'Review not found' });
-    const tokenEmail = (req.userEmail || '').toLowerCase();
-    if (!tokenEmail || existing.userEmail.toLowerCase() !== tokenEmail) return res.status(403).json({ message: 'Forbidden: not the owner' });
-    await reviewsCol.deleteOne({ _id: new ObjectId(id) });
-    try { await favoritesCol.deleteMany({ review: new ObjectId(id) }); } catch { }
->>>>>>> e43baf49644f1ba8644ad1ce26729bc6f034d74e
     return res.json({ message: 'Deleted successfully' });
   } catch (err) {
     return res.status(500).json({ message: err.message || 'Failed to delete review' });

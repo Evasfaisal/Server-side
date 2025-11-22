@@ -27,6 +27,6 @@
   },
   "homepage": "https://github.com/Evasfaisal/Server-side#readme",
   "devDependencies": {
-    "nodemon": "^3.1.10"
+    "nodemon": "^3.1.11"
   }
 }
