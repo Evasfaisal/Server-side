@@ -1,7 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
-const mongoose = require('mongoose');
+const { MongoClient } = require('mongodb');
 
 dotenv.config();
 const app = express();
@@ -47,8 +47,14 @@ try {
 }
 app.use(optionalAuth);
 
-mongoose.connect(process.env.MONGO_URI)
-  .then(() => console.log("✅ MongoDB Connected"))
+
+const client = new MongoClient(process.env.MONGO_URI);
+client.connect()
+  .then(() => {
+    console.log("✅ MongoDB Connected");
+    const dbName = process.env.DB_NAME || client.db().databaseName;
+    app.locals.db = client.db(dbName);
+  })
   .catch(err => { console.error(err); process.exit(1); });
 
 const reviewRoutes = require('./routes/reviewRoutes');

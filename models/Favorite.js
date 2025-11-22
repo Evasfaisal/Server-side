@@ -1,13 +1,29 @@
-const mongoose = require("mongoose");
 
-const favoriteSchema = new mongoose.Schema(
-  {
-    userEmail: { type: String, required: true, lowercase: true, trim: true },
-    review: { type: mongoose.Schema.Types.ObjectId, ref: "Review", required: true },
-  },
-  { timestamps: true }
-);
+const { ObjectId } = require('mongodb');
 
-favoriteSchema.index({ userEmail: 1, review: 1 }, { unique: true });
+const COLLECTION_NAME = 'favorites';
 
-module.exports = mongoose.models.Favorite || mongoose.model("Favorite", favoriteSchema);
+async function createFavorite(db, data) {
+  data.userEmail = String(data.userEmail).toLowerCase().trim();
+  data.review = new ObjectId(data.review);
+  const result = await db.collection(COLLECTION_NAME).insertOne(data);
+  return result.ops ? result.ops[0] : result;
+}
+
+async function getFavorites(db, filter = {}) {
+  if (filter.userEmail) filter.userEmail = String(filter.userEmail).toLowerCase().trim();
+  if (filter.review) filter.review = new ObjectId(filter.review);
+  return db.collection(COLLECTION_NAME).find(filter).toArray();
+}
+
+async function deleteFavorite(db, filter = {}) {
+  if (filter.userEmail) filter.userEmail = String(filter.userEmail).toLowerCase().trim();
+  if (filter.review) filter.review = new ObjectId(filter.review);
+  return db.collection(COLLECTION_NAME).deleteOne(filter);
+}
+
+module.exports = {
+  createFavorite,
+  getFavorites,
+  deleteFavorite
+};

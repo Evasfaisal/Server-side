@@ -1,4 +1,4 @@
-const mongoose = require('mongoose');
+const { ObjectId } = require('mongodb');
 const Review = require('../models/Review');
 const Favorite = require('../models/Favorite');
 
@@ -44,6 +44,7 @@ function validateUpdate(n) {
 
 async function createReview(req, res) {
   try {
+    const db = req.app.locals.db;
     const tokenEmail = (req.userEmail || '').toLowerCase();
     const bodyEmail = (req.body.userEmail || req.body.email || '').toLowerCase();
     if (!tokenEmail) return res.status(401).json({ message: 'Unauthorized' });
@@ -52,8 +53,7 @@ async function createReview(req, res) {
     const n = normalize(req.body);
     const errMsg = validateCreate(n);
     if (errMsg) return res.status(400).json({ message: errMsg });
-    const doc = new Review({ ...n, userEmail: tokenEmail });
-    const saved = await doc.save();
+    const saved = await Review.createReview(db, { ...n, userEmail: tokenEmail });
     return res.status(201).json(saved);
   } catch (err) {
     return res.status(400).json({ message: err.message || 'Failed to add review' });
@@ -62,8 +62,9 @@ async function createReview(req, res) {
 
 async function updateReview(req, res) {
   try {
-    if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ message: 'Invalid review ID' });
-    const existing = await Review.findById(req.params.id);
+    const db = req.app.locals.db;
+    if (!ObjectId.isValid(req.params.id)) return res.status(400).json({ message: 'Invalid review ID' });
+    const existing = await Review.getReviewById(db, req.params.id);
     if (!existing) return res.status(404).json({ message: 'Review not found' });
 
     const tokenEmail = (req.userEmail || '').toLowerCase();
@@ -73,7 +74,7 @@ async function updateReview(req, res) {
     const errMsg = validateUpdate(n);
     if (errMsg) return res.status(400).json({ message: errMsg });
     const { userEmail, email, ...rest } = n;
-    const updated = await Review.findByIdAndUpdate(req.params.id, { $set: rest }, { new: true });
+    const updated = await Review.updateReview(db, req.params.id, rest);
     return res.json(updated);
   } catch (err) {
     return res.status(400).json({ message: err.message || 'Failed to update review' });
@@ -82,13 +83,14 @@ async function updateReview(req, res) {
 
 async function deleteReview(req, res) {
   try {
-    if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ message: 'Invalid review ID' });
-    const existing = await Review.findById(req.params.id);
+    const db = req.app.locals.db;
+    if (!ObjectId.isValid(req.params.id)) return res.status(400).json({ message: 'Invalid review ID' });
+    const existing = await Review.getReviewById(db, req.params.id);
     if (!existing) return res.status(404).json({ message: 'Review not found' });
     const tokenEmail = (req.userEmail || '').toLowerCase();
     if (!tokenEmail || existing.userEmail.toLowerCase() !== tokenEmail) return res.status(403).json({ message: 'Forbidden: not the owner' });
-    await Review.findByIdAndDelete(req.params.id);
-    try { await Favorite.deleteMany({ review: req.params.id }); } catch { }
+    await Review.deleteReview(db, req.params.id);
+    try { await Favorite.deleteFavorite(db, { review: req.params.id }); } catch { }
     return res.json({ message: 'Deleted successfully' });
   } catch (err) {
     return res.status(500).json({ message: err.message || 'Failed to delete review' });
