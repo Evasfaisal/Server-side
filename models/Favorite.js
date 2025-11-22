@@ -1,4 +1,5 @@
 
+<<<<<<< HEAD
 const { ObjectId } = require('mongodb');
 
 const COLLECTION_NAME = 'favorites';
@@ -27,3 +28,11 @@ module.exports = {
   getFavorites,
   deleteFavorite
 };
+=======
+// Helper to get the favorites collection from app.locals
+function getFavoritesCollection(app) {
+  return app.locals.favorites;
+}
+
+module.exports = { getFavoritesCollection };
+>>>>>>> e43baf49644f1ba8644ad1ce26729bc6f034d74e
