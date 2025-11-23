@@ -1,12 +1,9 @@
 const express = require('express');
+
 const { ObjectId } = require('mongodb');
 const Review = require('../models/Review');
 const Favorite = require('../models/Favorite');
-let requireAuth = (req, res, next) => next();
-try {
-    ({ requireAuth } = require('../middleware/auth'));
-} catch (e) {
-}
+const { verifyFirebaseToken } = require('../middleware/firebaseAuth');
 const { createReview, updateReview, deleteReview } = require('../controllers/reviewController');
 
 const router = express.Router();
@@ -53,7 +50,7 @@ router.get('/recent', async (req, res) => {
     }
 });
 
-router.get('/mine', requireAuth, async (req, res) => {
+router.get('/mine', verifyFirebaseToken, async (req, res) => {
     try {
         const db = req.app.locals.db;
         const email = (req.userEmail || '').toLowerCase();
@@ -88,10 +85,9 @@ router.get('/:id', async (req, res) => {
     }
 });
 
-router.post('/', requireAuth, createReview);
 
-router.put('/:id', requireAuth, updateReview);
-
-router.delete('/:id', requireAuth, deleteReview);
+router.post('/', verifyFirebaseToken, createReview);
+router.put('/:id', verifyFirebaseToken, updateReview);
+router.delete('/:id', verifyFirebaseToken, deleteReview);
 
 module.exports = router;

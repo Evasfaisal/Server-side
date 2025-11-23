@@ -72,6 +72,10 @@ router.post("/", async (req, res) => {
     if (!ObjectId.isValid(reviewId)) {
         return res.status(400).json({ message: "Invalid review ID" });
     }
+    // userEmail validation
+    if (!userEmail || typeof userEmail !== 'string' || !userEmail.includes('@') || userEmail.length < 5) {
+        return res.status(400).json({ message: "Invalid or missing userEmail" });
+    }
     try {
         const db = req.app.locals.db;
         const tokenEmail = String(req.userEmail || '').toLowerCase();
@@ -81,7 +85,6 @@ router.post("/", async (req, res) => {
         console.log('[favorites] POST /api/favorites', { tokenEmail, bodyEmail, effectiveEmail, reviewId });
         if (!effectiveEmail) return res.status(401).json({ message: 'Unauthorized' });
         if (tokenEmail && bodyEmail && tokenEmail !== bodyEmail) return res.status(403).json({ message: "Forbidden: email mismatch" });
-
 
         const existsArr = await Favorite.getFavorites(db, { userEmail: effectiveEmail, review: reviewId });
         if (existsArr.length > 0) {
@@ -106,6 +109,10 @@ router.delete("/", async (req, res) => {
     const reviewId = typeof review === 'object' && review !== null ? (review._id || review.id) : review;
     if (!reviewId || !ObjectId.isValid(reviewId)) {
         return res.status(400).json({ message: "Invalid data" });
+    }
+    // userEmail validation
+    if (!userEmail || typeof userEmail !== 'string' || !userEmail.includes('@') || userEmail.length < 5) {
+        return res.status(400).json({ message: "Invalid or missing userEmail" });
     }
     try {
         const db = req.app.locals.db;
@@ -134,6 +141,10 @@ router.delete("/:id", async (req, res) => {
     const tokenEmail = String(req.userEmail || '').toLowerCase();
     const allowBody = (process.env.ALLOW_DEV_EMAIL_BODY || 'false').toLowerCase() === 'true';
     const queryEmail = req.query && req.query.email ? String(req.query.email).toLowerCase().trim() : '';
+    // userEmail validation
+    if (!tokenEmail && (!queryEmail || typeof queryEmail !== 'string' || !queryEmail.includes('@') || queryEmail.length < 5)) {
+        return res.status(400).json({ message: "Invalid or missing userEmail" });
+    }
     const effectiveEmail = tokenEmail || (allowBody ? queryEmail : '');
     if (!effectiveEmail) return res.status(401).json({ message: 'Unauthorized' });
     const id = req.params.id;
@@ -144,7 +155,6 @@ router.delete("/:id", async (req, res) => {
 
         let result = await Favorite.deleteFavorite(db, { _id: new ObjectId(id), userEmail: effectiveEmail });
         if (!result.deletedCount) {
-
             result = await Favorite.deleteFavorite(db, { review: id, userEmail: effectiveEmail });
         }
         if (!result.deletedCount) return res.status(404).json({ message: 'Not found' });

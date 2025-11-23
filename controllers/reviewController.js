@@ -45,7 +45,7 @@ function validateUpdate(n) {
 async function createReview(req, res) {
   try {
     const db = req.app.locals.db;
-    const tokenEmail = (req.userEmail || '').toLowerCase();
+    const tokenEmail = (req.user && req.user.email ? req.user.email : '').toLowerCase();
     const bodyEmail = (req.body.userEmail || req.body.email || '').toLowerCase();
     if (!tokenEmail) return res.status(401).json({ message: 'Unauthorized' });
     if (bodyEmail && bodyEmail !== tokenEmail) return res.status(403).json({ message: 'Forbidden: email mismatch' });
