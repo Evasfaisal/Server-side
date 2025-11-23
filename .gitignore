@@ -1,3 +1,5 @@
+# Ignore environment variables and secrets
+.env
 .env
 serviceAcccountKey.json
 node_modules/
