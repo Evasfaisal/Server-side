@@ -48,44 +48,47 @@ app.use(optionalAuth);
 
 
 const client = new MongoClient(process.env.MONGO_URI);
-client.connect()
-  .then(() => {
+
+async function startServer() {
+  try {
+    await client.connect();
     console.log("✅ MongoDB Connected");
     const dbName = process.env.DB_NAME || client.db().databaseName;
     app.locals.db = client.db(dbName);
-  })
-  .catch(err => { console.error(err); process.exit(1); });
 
-const reviewRoutes = require('./routes/reviewRoutes');
-const favoriteRoutes = require('./routes/favoriteRoutes');
-const restaurantRoutes = require('./routes/restaurantRoutes');
+    const reviewRoutes = require('./routes/reviewRoutes');
+    const favoriteRoutes = require('./routes/favoriteRoutes');
+    const restaurantRoutes = require('./routes/restaurantRoutes');
 
-app.use('/api/reviews', reviewRoutes);
-app.use('/api/favorites', favoriteRoutes);
-app.use('/api/restaurants', restaurantRoutes);
+    app.use('/api/reviews', reviewRoutes);
+    app.use('/api/favorites', favoriteRoutes);
+    app.use('/api/restaurants', restaurantRoutes);
 
-app.get('/', (req, res) => {
-  res.send('Server running...');
-});
+    app.get('/', (req, res) => {
+      res.send('Server running...');
+    });
 
-app.use((err, req, res, next) => {
-  console.error('Unhandled error:', err);
-  if (err.name === 'ValidationError') {
-    return res.status(400).json({ message: err.message });
+    app.use((err, req, res, next) => {
+      console.error('Unhandled error:', err);
+      if (err.name === 'ValidationError') {
+        return res.status(400).json({ message: err.message });
+      }
+      if (err.type === 'entity.parse.failed' || err instanceof SyntaxError) {
+        return res.status(400).json({ message: 'Invalid JSON payload' });
+      }
+      if (err.message === 'Not allowed by CORS') {
+        return res.status(403).json({ message: 'Origin not allowed by CORS' });
+      }
+      return res.status(500).json({ message: 'Internal Server Error' });
+    });
+
+    app.listen(port, () => {
+      console.log(`🚀 Server running on port ${port}`);
+    });
+  } catch (err) {
+    console.error(err);
+    process.exit(1);
   }
-  if (err.type === 'entity.parse.failed' || err instanceof SyntaxError) {
-    return res.status(400).json({ message: 'Invalid JSON payload' });
-  }
-  if (err.message === 'Not allowed by CORS') {
-    return res.status(403).json({ message: 'Origin not allowed by CORS' });
-  }
-  return res.status(500).json({ message: 'Internal Server Error' });
-});
+}
 
-
-
-app.listen(port, () => {
-  console.log(`🚀 Server running on port ${port}`);
-});
-
-
+startServer();

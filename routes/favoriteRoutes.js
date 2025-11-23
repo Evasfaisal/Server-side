@@ -2,7 +2,6 @@ const express = require("express");
 const router = express.Router();
 const { ObjectId } = require('mongodb');
 const Favorite = require("../models/Favorite");
-// const { verifyFirebaseToken } = require("../middleware/firebaseAuth");
 let requireAuth = (req, res, next) => next();
 let optionalAuth = (req, _res, next) => {
     const header = req.headers['x-user-email'];
