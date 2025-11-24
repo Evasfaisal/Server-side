@@ -67,8 +67,10 @@ async function updateReview(req, res) {
     const existing = await Review.getReviewById(db, req.params.id);
     if (!existing) return res.status(404).json({ message: 'Review not found' });
 
-    const tokenEmail = (req.userEmail || '').toLowerCase();
-    if (!tokenEmail || existing.userEmail.toLowerCase() !== tokenEmail) return res.status(403).json({ message: 'Forbidden: not the owner' });
+    const tokenEmail = (req.user && req.user.email ? req.user.email : '').toLowerCase();
+    const ownerEmail = (existing.userEmail || '').toLowerCase();
+    console.log('Review owner check:', { tokenEmail, ownerEmail });
+    if (!tokenEmail || ownerEmail !== tokenEmail) return res.status(403).json({ message: 'Forbidden: not the owner' });
 
     const n = normalize(req.body);
     const errMsg = validateUpdate(n);
@@ -87,8 +89,10 @@ async function deleteReview(req, res) {
     if (!ObjectId.isValid(req.params.id)) return res.status(400).json({ message: 'Invalid review ID' });
     const existing = await Review.getReviewById(db, req.params.id);
     if (!existing) return res.status(404).json({ message: 'Review not found' });
-    const tokenEmail = (req.userEmail || '').toLowerCase();
-    if (!tokenEmail || existing.userEmail.toLowerCase() !== tokenEmail) return res.status(403).json({ message: 'Forbidden: not the owner' });
+    const tokenEmail = (req.user && req.user.email ? req.user.email : '').toLowerCase();
+    const ownerEmail = (existing.userEmail || '').toLowerCase();
+    console.log('Review owner check:', { tokenEmail, ownerEmail });
+    if (!tokenEmail || ownerEmail !== tokenEmail) return res.status(403).json({ message: 'Forbidden: not the owner' });
     await Review.deleteReview(db, req.params.id);
     try { await Favorite.deleteFavorite(db, { review: req.params.id }); } catch { }
     return res.json({ message: 'Deleted successfully' });
